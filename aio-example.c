@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
     aio_context_t ioctx = 0;
     unsigned maxevents = 128;
 
-    int fd = open("FILE", O_RDONLY | O_DIRECT);
+    int fd = open("FILE", O_RDONLY | O_DIRECT, S_IRUSR | S_IWUSR);
     if (fd == -1) {
         perror(argv[1]);
         exit(1);
@@ -53,7 +53,12 @@ int main(int argc, char *argv[])
     }
 
     // first operation
-    char buff1[512];
+    char* buff1 = malloc(sizeof(char*));
+	int err = posix_memalign((void **)&buff1, 4096, 512);
+	if (err) {
+        perror("memalign");
+        exit(1);
+	}
     struct iocb iocb1 = {0};
     iocb1.aio_data       = 0xbeef; /* will be returned in events data */
     iocb1.aio_fildes     = fd;
@@ -64,7 +69,12 @@ int main(int argc, char *argv[])
     iocb1.aio_offset     = 0;
 
     // second operation
-    char buff2[512];
+    char* buff2 = malloc(sizeof(char*));
+	err = posix_memalign((void **)&buff2, 4096, 512);
+	if (err) {
+        perror("memalign");
+        exit(1);
+	}
     struct iocb iocb2 = {0};
     iocb2.aio_data       = 0xbaba; /* will be returned in events data */
     iocb2.aio_fildes     = fd;

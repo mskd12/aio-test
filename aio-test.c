@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include <errno.h>
 #include <linux/aio_abi.h>
+#include <time.h>
 
 #include "ccan/list/list.h"
 #include "ccan/minmax/minmax.h"
@@ -18,7 +19,7 @@
 #define OP_SIZE     512
 #define NOPS        100000
 #define WR_P        0
-#define QUEUE_DEPTH 32
+#define QUEUE_DEPTH 64
 
 struct conf {
 	size_t op_size;
@@ -285,6 +286,7 @@ int main(int argc, char *argv[])
 	if (cnf.drop_caches)
 		drop_caches();
 
+    clock_t t0 = clock();
 	struct iocb *iocb_ptrs[cnf.queue_depth];
 	struct io_event io_events[cnf.queue_depth];
 	size_t submitted = 0, completed = 0;
@@ -324,12 +326,17 @@ int main(int argc, char *argv[])
 			if (ev->res2 != 0 || ev->res != cnf.op_size)
 				fprintf(stderr, "******************** Event returned with res=%lld res2=%lld\n", ev->res, ev->res2);
 			struct io_op *op = (void *)ev->data;
+            assert(strtoll(op->buff, NULL, 10) == op->iocb.aio_offset / cnf.op_size);
 			put_io_op(&slab, op);
 		}
 		completed += to_complete;
 
-		printf("in_flight:%zd submitted:%zd (total:%zd) completed:%zd (total:%zd)\n", submitted - completed, to_submit, submitted, to_complete, completed);
+		// printf("in_flight:%zd submitted:%zd (total:%zd) completed:%zd (total:%zd)\n", submitted - completed, to_submit, submitted, to_complete, completed);
 	}
+    clock_t t1 = clock();
+    double time_taken = ((double) (t1 - t0))/ (CLOCKS_PER_SEC / 1000); // in ms
+    printf("Time for %zd reads: %f\n", cnf.nops, time_taken);
+    printf("Time per read: %f\n", time_taken / cnf.nops);
 
 	io_op_slab_destroy(&slab);
 	io_destroy(ioctx);
