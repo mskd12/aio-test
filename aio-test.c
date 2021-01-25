@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <errno.h>
@@ -286,7 +287,11 @@ int main(int argc, char *argv[])
 	if (cnf.drop_caches)
 		drop_caches();
 
-    clock_t t0 = clock();
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t0);    
+    float cdiff = 0;
+    clock_t c0 = clock();
 	struct iocb *iocb_ptrs[cnf.queue_depth];
 	struct io_event io_events[cnf.queue_depth];
 	size_t submitted = 0, completed = 0;
@@ -333,10 +338,19 @@ int main(int argc, char *argv[])
 
 		// printf("in_flight:%zd submitted:%zd (total:%zd) completed:%zd (total:%zd)\n", submitted - completed, to_submit, submitted, to_complete, completed);
 	}
-    clock_t t1 = clock();
-    double time_taken = ((double) (t1 - t0))/ (CLOCKS_PER_SEC / 1000); // in ms
-    printf("Time for %zd reads: %f\n", cnf.nops, time_taken);
-    printf("Time per read: %f\n", time_taken / cnf.nops);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t1);    
+    double tdiff = (t1.tv_sec - t0.tv_sec) * 1000 + (double) (t1.tv_nsec - t0.tv_nsec) / 1000000;
+    
+    clock_t c1 = clock();
+    cdiff = ((double) (c1 - c0))/ (CLOCKS_PER_SEC / 1000); // in ms
+
+    // std::cout << "Actual time for " << num_jobs << " reads: " << tdiff << std::endl;
+    // std::cout << "CPU time for " << num_jobs << " reads: " << cdiff << std::endl;
+    // std::cout << "Time per read " << tdiff / num_jobs << std::endl;
+
+    printf("CPU time for %zd reads: %f\n", cnf.nops, cdiff);
+    printf("Time for %zd reads: %f\n", cnf.nops, tdiff);
+    printf("Time per read: %f\n", tdiff / cnf.nops);
 
 	io_op_slab_destroy(&slab);
 	io_destroy(ioctx);
